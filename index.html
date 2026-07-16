@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Smart Leave Permission System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: url("https://tech-mates2027.github.io/IRE.in/cmrtc%20hdbg.jpg") no-repeat center center;
+            background-size: cover;
+            min-height: 100vh;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.55);
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
+        h1 {
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #00c6ff;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 420px;
+            margin: 10px;
+            padding: 20px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        input,
+        textarea,
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border: none;
+        }
+
+        button {
+            background: linear-gradient(45deg, #00c6ff, #0072ff);
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        .reject {
+            background: red;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #leaveLetter {
+            background: white;
+            color: black;
+            border-radius: 15px;
+            padding: 15px;
+            display: none;
+        }
+
+        #notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #00c6ff;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #000;
+            display: none;
+            font-weight: bold;
+            z-index: 999;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🎓 Leave Permission System (FAB FOUR 🚀)</h1>
+
+    <div id="notification"></div>
+
+    <!-- LOGIN -->
+    <div class="container" id="loginPage">
+        <h2>🔐 Login</h2>
+        <input type="text" id="username" placeholder="Username (Roll No for students)">
+        <input type="password" id="password" placeholder="Password (same as Roll No)">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <!-- STUDENT -->
+    <div class="container hidden" id="studentForm">
+        <h2>📝 Student Request</h2>
+        <input type="text" id="studentName" placeholder="Name">
+        <input type="text" id="rollNo" placeholder="Roll No">
+        <input type="text" id="course" placeholder="Course">
+        <textarea id="reason" placeholder="Reason"></textarea>
+        <input type="date" id="startDate">
+        <input type="date" id="endDate">
+        <button onclick="submitRequest()">Submit Request</button>
+        <h3 id="statusText"></h3>
+    </div>
+
+    <!-- APPROVAL -->
+    <div class="container hidden" id="approvalPanel">
+        <h2 id="roleTitle"></h2>
+        <div id="requestData"></div>
+    </div>
+
+    <!-- LETTER -->
+    <div class="container" id="leaveLetter">
+        <h2>📄 Leave Letter</h2>
+        <pre id="letterContent"></pre>
+    </div>
+
+    <script>
+        const users = {
+            mentor: {
+                username: "mentor",
+                password: "123"
+            },
+            coordinator: {
+                username: "co",
+                password: "123"
+            },
+            hod: {
+                username: "hod",
+                password: "123"
+            }
+        };
+
+        let currentRole = "";
+        let currentRoll = "";
+        let requests = JSON.parse(localStorage.getItem("requests")) || [];
+
+        function login() {
+            let user = username.value;
+            let pass = password.value;
+
+            for (let role in users) {
+                if (users[role].username === user && users[role].password === pass) {
+                    currentRole = role;
+                    loginPage.classList.add("hidden");
+                    approvalPanel.classList.remove("hidden");
+                    roleTitle.innerText = role.toUpperCase() + " PANEL";
+                    loadRequests();
+                    return;
+                }
+            }
+
+            if (pass === user && user !== "") {
+                currentRole = "student";
+                currentRoll = user;
+                loginPage.classList.add("hidden");
+                studentForm.classList.remove("hidden");
+                rollNo.value = user;
+                showMyData();
+                return;
+            }
+
+            alert("Invalid Login ❌");
+        }
+
+        function submitRequest() {
+            let req = {
+                id: Date.now(),
+                studentName: studentName.value,
+                rollNo: rollNo.value,
+                course: course.value,
+                reason: reason.value,
+                startDate: startDate.value,
+                endDate: endDate.value,
+                approvals: {
+                    mentor: null,
+                    coordinator: null,
+                    hod: null
+                },
+                letter: ""
+            };
+
+            currentRoll = rollNo.value;
+
+            requests.push(req);
+            save();
+            showNotification("📨 Request Submitted!");
+        }
+
+        function loadRequests() {
+            requestData.innerHTML = "";
+
+            requests.forEach(r => {
+                requestData.innerHTML += `
+    <div style="border:1px solid white;padding:10px;margin:10px;border-radius:10px;">
+      <b>${r.studentName}</b> (${r.rollNo})<br>
+      ${r.reason}<br>
+      ${r.startDate} → ${r.endDate}<br>
+      <b>Status:</b> ${getStatus(r)}<br><br>
+
+      <button onclick="approve(${r.id})">Approve</button>
+      <button class="reject" onclick="reject(${r.id})">Reject</button>
+    </div>`;
+            });
+        }
+
+        function approve(id) {
+            let r = requests.find(x => x.id === id);
+
+            if (currentRole === "coordinator" && r.approvals.mentor !== true) {
+                alert("Mentor approval required!");
+                return;
+            }
+            if (currentRole === "hod" && r.approvals.coordinator !== true) {
+                alert("Coordinator approval required!");
+                return;
+            }
+
+            r.approvals[currentRole] = true;
+
+            if (currentRole === "hod") {
+                r.letter = generateLetter(r);
+            }
+
+            save();
+            loadRequests();
+            showNotification(currentRole.toUpperCase() + " Approved ✅");
+        }
+
+        function reject(id) {
+            let r = requests.find(x => x.id === id);
+            r.approvals[currentRole] = false;
+            save();
+            loadRequests();
+            showNotification("❌ Rejected");
+        }
+
+        function getStatus(r) {
+            if (Object.values(r.approvals).includes(false)) return "❌ Rejected";
+            if (Object.values(r.approvals).every(v => v === true)) return "🎉 Approved";
+            return "⏳ Pending";
+        }
+
+        function showMyData() {
+            let my = requests.filter(x => x.rollNo === currentRoll);
+
+            if (!my.length) {
+                statusText.innerText = "No requests yet";
+                return;
+            }
+
+            let last = my[my.length - 1];
+
+            statusText.innerText = getStatus(last);
+
+            if (last.letter) {
+                leaveLetter.style.display = "block";
+                letterContent.textContent = last.letter;
+            }
+        }
+
+        setInterval(() => {
+            if (currentRole === "student") {
+                showMyData();
+            }
+        }, 3000);
+
+        /* ✅ UPDATED LETTER FUNCTION */
+        function generateLetter(r) {
+            let today = new Date().toLocaleDateString();
+
+            let start = new Date(r.startDate);
+            let end = new Date(r.endDate);
+
+            let durationText = "";
+
+            if (r.startDate === r.endDate) {
+                durationText = "Half Day Leave";
+            } else {
+                let diffTime = end - start;
+                let days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                durationText = days + " Days Leave";
+            }
+
+            return `
+To,
+The Head of Department
+
+Date: ${today}
+
+Subject: Leave Application
+
+I, ${r.studentName} (${r.rollNo}),
+pursuing ${r.course},
+request ${durationText} from ${r.startDate} to ${r.endDate}
+due to ${r.reason}.
+
+Approved by Mentor, Coordinator & HOD.
+
+Yours sincerely,
+${r.studentName}
+`;
+        }
+
+        function save() {
+            localStorage.setItem("requests", JSON.stringify(requests));
+        }
+
+        function showNotification(message) {
+            let box = document.getElementById("notification");
+            box.innerText = message;
+            box.style.display = "block";
+            setTimeout(() => box.style.display = "none", 3000);
+        }
+    </script>
+</body>
+
+</html>
