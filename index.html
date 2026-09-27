@@ -82,6 +82,39 @@
             display: none;
         }
 
+        .role-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 16px;
+            padding: 14px 20px;
+            margin: 10px 0;
+            background: linear-gradient(45deg, #00c6ff, #0072ff);
+            color: white;
+            font-weight: bold;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 198, 255, 0.3);
+        }
+
+        .role-btn:hover {
+            transform: scale(1.04);
+            box-shadow: 0 6px 20px rgba(0, 198, 255, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.18);
+            color: white;
+            font-weight: 500;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.28);
+        }
+
         #leaveLetter {
             background: white;
             color: black;
@@ -112,12 +145,22 @@
 
     <div id="notification"></div>
 
+    <!-- ROLE SELECTION (FIRST INTERFACE) -->
+    <div class="container" id="roleSelection">
+        <h2 style="text-align: center; margin-bottom: 15px;">👥 Select Role</h2>
+        <button class="role-btn" onclick="openLogin('student')">👨‍🎓 Student</button>
+        <button class="role-btn" onclick="openLogin('mentor')">👨‍🏫 Mentor</button>
+        <button class="role-btn" onclick="openLogin('coordinator')">📋 Co-ordinator</button>
+        <button class="role-btn" onclick="openLogin('hod')">🎓 HOD</button>
+    </div>
+
     <!-- LOGIN -->
-    <div class="container" id="loginPage">
-        <h2>🔐 Login</h2>
-        <input type="text" id="username" placeholder="Username (Roll No for students)">
-        <input type="password" id="password" placeholder="Password (same as Roll No)">
+    <div class="container hidden" id="loginPage">
+        <h2 id="loginTitle">🔐 Login</h2>
+        <input type="text" id="username" placeholder="Username (Roll No for students)" onkeydown="if(event.key === 'Enter') login()">
+        <input type="password" id="password" placeholder="Password (same as Roll No)" onkeydown="if(event.key === 'Enter') login()">
         <button onclick="login()">Login</button>
+        <button class="btn-secondary" onclick="backToRoles()">⬅ Back to Roles</button>
     </div>
 
     <!-- STUDENT -->
@@ -131,12 +174,14 @@
         <input type="date" id="endDate">
         <button onclick="submitRequest()">Submit Request</button>
         <h3 id="statusText"></h3>
+        <button class="btn-secondary" onclick="logout()" style="margin-top: 15px;">⬅ Logout / Switch Role</button>
     </div>
 
     <!-- APPROVAL -->
     <div class="container hidden" id="approvalPanel">
         <h2 id="roleTitle"></h2>
         <div id="requestData"></div>
+        <button class="btn-secondary" onclick="logout()" style="margin-top: 15px;">⬅ Logout / Switch Role</button>
     </div>
 
     <!-- LETTER -->
@@ -144,6 +189,41 @@
         <h2>📄 Leave Letter</h2>
         <pre id="letterContent"></pre>
     </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-analytics.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAbtZlSXAeae2YyLuglqURGf8D3Xg-uiCs",
+            authDomain: "fab-four.firebaseapp.com",
+            projectId: "fab-four",
+            storageBucket: "fab-four.firebasestorage.app",
+            messagingSenderId: "690485073427",
+            appId: "1:690485073427:web:bbc7b9b8be14e4590a11e6",
+            measurementId: "G-3JNMN0RJE9"
+        };
+
+        window.firebaseReady = false;
+        window.firebaseReadyPromise = new Promise((resolve) => {
+            window.resolveFirebaseReady = resolve;
+        });
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        window.firebaseApp = app;
+        window.firebaseAnalytics = analytics;
+        window.firebaseDb = db;
+        window.doc = doc;
+        window.getDoc = getDoc;
+        window.setDoc = setDoc;
+        window.firebaseReady = true;
+        window.resolveFirebaseReady?.();
+        console.log("Firebase initialized successfully");
+    </script>
 
     <script>
         const users = {
@@ -161,13 +241,60 @@
             }
         };
 
+        let selectedRole = "";
         let currentRole = "";
         let currentRoll = "";
         let requests = JSON.parse(localStorage.getItem("requests")) || [];
 
+        function openLogin(role) {
+            selectedRole = role;
+            roleSelection.classList.add("hidden");
+            loginPage.classList.remove("hidden");
+            username.value = "";
+            password.value = "";
+
+            if (role === "student") {
+                loginTitle.innerText = "👨‍🎓 Student Login";
+                username.placeholder = "Username (Roll No)";
+                password.placeholder = "Password (same as Roll No)";
+            } else if (role === "mentor") {
+                loginTitle.innerText = "👨‍🏫 Mentor Login";
+                username.placeholder = "Username (mentor)";
+                username.value = "mentor";
+                password.placeholder = "Password (123)";
+            } else if (role === "coordinator") {
+                loginTitle.innerText = "📋 Co-ordinator Login";
+                username.placeholder = "Username (co)";
+                username.value = "co";
+                password.placeholder = "Password (123)";
+            } else if (role === "hod") {
+                loginTitle.innerText = "🎓 HOD Login";
+                username.placeholder = "Username (hod)";
+                username.value = "hod";
+                password.placeholder = "Password (123)";
+            }
+            password.focus();
+        }
+
+        function backToRoles() {
+            loginPage.classList.add("hidden");
+            roleSelection.classList.remove("hidden");
+            username.value = "";
+            password.value = "";
+        }
+
+        function logout() {
+            currentRole = "";
+            currentRoll = "";
+            studentForm.classList.add("hidden");
+            approvalPanel.classList.add("hidden");
+            leaveLetter.style.display = "none";
+            roleSelection.classList.remove("hidden");
+        }
+
         function login() {
-            let user = username.value;
-            let pass = password.value;
+            let user = username.value.trim();
+            let pass = password.value.trim();
 
             for (let role in users) {
                 if (users[role].username === user && users[role].password === pass) {
@@ -332,8 +459,40 @@ ${r.studentName}
 `;
         }
 
-        function save() {
+        async function ensureFirebaseReady() {
+            if (window.firebaseReady) return;
+            await window.firebaseReadyPromise;
+        }
+
+        async function save() {
             localStorage.setItem("requests", JSON.stringify(requests));
+
+            if (window.firebaseDb) {
+                try {
+                    await ensureFirebaseReady();
+                    await window.setDoc(window.doc(window.firebaseDb, "leaveSystem", "requests"), { requests });
+                } catch (error) {
+                    console.error("Firebase save failed:", error);
+                }
+            }
+        }
+
+        async function loadFromFirebase() {
+            if (!window.firebaseDb) return;
+
+            try {
+                await ensureFirebaseReady();
+                const snapshot = await window.getDoc(window.doc(window.firebaseDb, "leaveSystem", "requests"));
+                if (snapshot.exists()) {
+                    const data = snapshot.data();
+                    if (Array.isArray(data.requests)) {
+                        requests = data.requests;
+                        localStorage.setItem("requests", JSON.stringify(requests));
+                    }
+                }
+            } catch (error) {
+                console.error("Firebase load failed:", error);
+            }
         }
 
         function showNotification(message) {
@@ -342,6 +501,15 @@ ${r.studentName}
             box.style.display = "block";
             setTimeout(() => box.style.display = "none", 3000);
         }
+
+        window.addEventListener("DOMContentLoaded", () => {
+            loadFromFirebase().then(() => {
+                loadRequests();
+                if (currentRole === "student") {
+                    showMyData();
+                }
+            });
+        });
     </script>
 </body>
 
